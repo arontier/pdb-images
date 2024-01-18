@@ -16,6 +16,7 @@ import { getElementsInChains, getEntityInfo } from './structure-info';
 const SET1 = colorArray(ColorLists['set-1'].list.slice(0, 8)); // Discard the last color (gray)
 const SET2 = colorArray(ColorLists['set-2'].list.slice(0, 7)); // Discard the last color (gray)
 const DARK2 = colorArray(ColorLists['dark-2'].list.slice(0, 7)); // Discard the last color (gray)
+const RAINBOW = colorArray(ColorLists['rainbow'].list.slice(0, 5)); // Discard the last color (gray)
 
 const SET1_SAFE = [SET1[2], SET1[3], SET1[4], SET1[6], SET1[7]]; // Discard colors that conflict with element coloring (red oxygen, blue nitrogen, yellow sulfur)
 const SET2_SAFE = [SET2[6], SET2[0], SET2[1], SET2[2], SET2[3], SET2[4]]; // Discard colors that conflict with element coloring (yellow sulfur), move the poopish #6 as first, so is drawn as last
@@ -81,6 +82,54 @@ export function assignEntityAndUnitColors(structure: Structure) {
         }
         if (!color) {
             color = polymerColors.next().value!;
+        }
+        entityColors.push(color);
+        entityIndex[id] = i;
+    }
+
+    const unitColors = [];
+    const entityInstanceCounters: { [entityId: string]: number } = {};
+    for (const unit of structure.units ?? []) {
+        const firstElementIdx = unit.elements[0];
+        const chainIdx = unit.model.atomicHierarchy.chainAtomSegments.index[firstElementIdx];
+        const entityId = unit.model.atomicHierarchy.chains.label_entity_id.value(chainIdx);
+        const baseColor = entityColors[entityIndex[entityId]];
+        entityInstanceCounters[entityId] ??= 0;
+        const color = SisterColors.getSisterColor(baseColor, entityInstanceCounters[entityId]++);
+        unitColors.push(color);
+    }
+    return { entities: entityColors, units: unitColors };
+}
+
+export function assignEntityAndUnitRainColors(structure: Structure) {
+    const polymerColors = cycleIterator(RAINBOW);
+    const ligandColors = cycleIterator(LIGAND_COLORS);
+    const waterColor = ElementSymbolColors.O;
+
+    structure = structure.parent ?? structure;
+
+    const entityInfo = getEntityInfo(structure);
+    const entities = structure.model.entities;
+    const entityColors: Color[] = [];
+    const entityIndex: { [entityId: string]: number } = {};
+    for (let i = 0; i < entities.data._rowCount; i++) {
+        const id = entities.data.id.value(i);
+        const typ = entities.data.type.value(i);
+        const elementSymbols = getElementsInChains(structure, entityInfo[id]?.chains ?? []);
+        let color: Color | undefined;
+        if (typ === 'water') {
+            color = waterColor;
+        }
+        if (!color && elementSymbols.length === 1) {
+            color = ElementSymbolColors[elementSymbols[0] as keyof ElementSymbolColors]; // might be undefined!
+        }
+        if (!color && typ === 'non-polymer') {
+            color = ligandColors.next().value!;
+        }
+        if (!color) {
+            color = RAINBOW.pop()!;
+            entityColors.push(...RAINBOW);
+
         }
         entityColors.push(color);
         entityIndex[id] = i;

@@ -15,7 +15,7 @@ import { PDBeAPI } from './api';
 import { ImageType, ImageTypes } from './args';
 import { Captions, ImageSpec } from './captions/captions';
 import { adjustCamera, changeCameraRotation, combineRotations, zoomAll } from './helpers/camera';
-import { ANNOTATION_COLORS, ENTITY_COLORS, MODRES_COLORS, assignEntityAndUnitColors, cycleIterator, lightnessVariant } from './helpers/colors';
+import { ANNOTATION_COLORS, ENTITY_COLORS, MODRES_COLORS, assignEntityAndUnitRainColors, assignEntityAndUnitColors, cycleIterator, lightnessVariant } from './helpers/colors';
 import { getModifiedResidueInfo } from './helpers/helpers';
 import { getLogger, oneLine } from './helpers/logging';
 import { countDomains, selectBestChainForDomains, sortDomainsByChain, sortDomainsByEntity } from './helpers/sifts';
@@ -136,7 +136,8 @@ export class ImageGenerator {
                 entityNames: await this.api.getEntityNames(entryId),
                 entityInfo: getEntityInfo(structure.data!)
             };
-            const colors = assignEntityAndUnitColors(structure.data!);
+            /** const colors = assignEntityAndUnitColors(structure.data!); */
+            const colors = assignEntityAndUnitRainColors(structure.data!);
 
             if (mode === 'pdb') {
                 if (this.shouldRender('entry')) {

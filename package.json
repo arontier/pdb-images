@@ -1,6 +1,6 @@
 {
   "name": "pdb-images",
-  "version": "2.4.0",
+  "version": "2.4.0_release_0.1.0",
   "description": "Generates images from mmCIF/BCIF files",
   "scripts": {
     "build": "tsc",
@@ -13,7 +13,7 @@
     "lib/"
   ],
   "directories.lib": "lib/",
-  "bin":{
+  "bin": {
     "pdb-images": "./lib/cli/pdb-images.js",
     "pdb2cif": "./lib/cli/pdb2cif.js"
   },
@@ -52,6 +52,7 @@
     "gl": "^6.0.2",
     "log4js": "^6.9.1",
     "molstar": "^3.44.0",
+    "pdb-images": "^2.4.0",
     "pngjs": "^6.0.0",
     "tslib": "^2.5.0"
   }
