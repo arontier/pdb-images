@@ -142,7 +142,8 @@ export class ImageGenerator {
             if (mode === 'pdb') {
                 if (this.shouldRender('entry')) {
                     if (nModels === 1) {
-                        await visuals.applyToAll(vis => vis.setColorByChainInstance({ colorList: colors.units }));
+                        /** await visuals.applyToAll(vis => vis.setColorByChainInstance({ colorList: colors.units })); */
+                        await visuals.applyToAll(vis => vis.setColorByBfactor('rainbow'));
                         await this.saveViews('all', view => Captions.forEntryOrAssembly({ ...context, coloring: 'chains', view }));
 
                         await visuals.applyToAll(vis => vis.setColorByEntity({ colorList: colors.entities }));
