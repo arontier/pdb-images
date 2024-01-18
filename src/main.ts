@@ -28,7 +28,7 @@ import * as Paths from './paths';
 import { makeSaveFunction } from './save';
 
 
-export const VERSION = '2.4.0_release_0.1.0';
+export const VERSION = '2.4.1';
 setFSModule(fs); // this is needed to make `fetch` work in MolStar
 const logger = getLogger(module);
 
