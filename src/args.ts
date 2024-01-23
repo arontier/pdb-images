@@ -64,6 +64,10 @@ export interface Args {
     allow_lowest_quality: boolean,
     /** Force outputting "bfactor" image type even if the structure is not from X-ray (this might be necessary for custom mmCIF files with missing information about experimental methods) */
     force_bfactor: boolean,
+    /** pocket list */
+    pocket: [],
+    /** static residue list */
+    residue: [],
     /** Date to use as "last_modification" in the caption JSON; `undefined` to use today's date formatted as YYYY-MM-DD */
     date: string | undefined,
     /** Remove all contents of the output directory before running */
@@ -93,6 +97,8 @@ export const Defaults = {
     ensemble_shades: false,
     allow_lowest_quality: false,
     force_bfactor: false,
+    pocket: [],
+    residue: [],
     date: undefined,
     clear: false,
     log: 'INFO',

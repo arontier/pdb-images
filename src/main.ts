@@ -28,7 +28,7 @@ import * as Paths from './paths';
 import { makeSaveFunction } from './save';
 
 
-export const VERSION = '2.4.1';
+export const VERSION = '2.4.2';
 setFSModule(fs); // this is needed to make `fetch` work in MolStar
 const logger = getLogger(module);
 
@@ -63,6 +63,8 @@ export function parseArguments(): Args {
     parser.add_argument('--ensemble-shades', { action: 'store_true', help: 'Show individual models within an ensemble in different shades of the base color (lighter and darker), default: use the same colors for all models.' });
     parser.add_argument('--allow-lowest-quality', { action: 'store_true', help: 'Allow any quality level for visuals, including "lowest", which is really ugly (default: allow only "lower" quality level and better).' });
     parser.add_argument('--force-bfactor', { action: 'store_true', help: 'Force outputting "bfactor" image type even if the structure is not from X-ray (this might be necessary for custom mmCIF files with missing information about experimental methods).' });
+    parser.add_argument('--pocket', { nargs: '*', help: 'pocket residues nums' });
+    parser.add_argument('--residue', { nargs: '*', help: 'static and ball residue nums' });
     parser.add_argument('--date', { help: `Date to use as "last_modification" in the caption JSON (default: today's date formatted as YYYY-MM-DD).` });
     parser.add_argument('--clear', { action: 'store_true', help: 'Remove all contents of the output directory before running.' });
     parser.add_argument('--log', { choices: [...LogLevels], type: (s: string) => s.toUpperCase(), default: Defaults.log, help: `Set logging level. Default: ${Defaults.log}.` });
@@ -119,7 +121,7 @@ export async function main(args: Args) {
                 forceBfactor: args.force_bfactor,
             };
             const imageGenerator = new ImageGenerator(plugin, saveFunction, api, args.type, args.view, options);
-            await imageGenerator.processAll(args.entry_id, runtimeUrl, args.mode);
+            await imageGenerator.processAll(args.entry_id, runtimeUrl, args.mode, args.pocket, args.residue);
             if (tmpStructureFile) fs.rmSync(tmpStructureFile, { force: true });
         } finally {
             plugin.dispose();

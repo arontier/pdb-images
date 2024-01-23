@@ -16,7 +16,11 @@ import { StructureRepresentation3D } from 'molstar/lib/commonjs/mol-plugin-state
 import { setSubtreeVisibility } from 'molstar/lib/commonjs/mol-plugin/behavior/static/state';
 import { PluginContext } from 'molstar/lib/commonjs/mol-plugin/context';
 import { getStructureQuality } from 'molstar/lib/commonjs/mol-repr/util';
+import { StructureSelectionQuery } from 'molstar/lib/mol-plugin-state/helpers/structure-selection-query'
+import { computeStructureMolecularSurface } from 'molstar/lib/commonjs/mol-repr/structure/visual/util/molecular-surface';
+import { MolecularSurfaceCalculationParams } from 'molstar/lib/commonjs/mol-math/geometry/molecular-surface';
 import { MolScriptBuilder } from 'molstar/lib/commonjs/mol-script/language/builder';
+import { Expression } from 'molstar/lib/commonjs/mol-script/language/expression';
 import { State, StateObject, StateObjectSelector, StateTransform } from 'molstar/lib/commonjs/mol-state';
 import { Color } from 'molstar/lib/commonjs/mol-util/color';
 import { ColorLists } from 'molstar/lib/commonjs/mol-util/color/lists';
@@ -25,10 +29,11 @@ import { ParamDefinition } from 'molstar/lib/commonjs/mol-util/param-definition'
 import { PDBeAPI } from './api';
 import { DEFAULT_COLORS, ENTITY_COLORS } from './helpers/colors';
 import { PPartial, chainLabel, deepMerge, toKebabCase } from './helpers/helpers';
-import { oneLine } from './helpers/logging';
+import { getLogger, oneLine } from './helpers/logging';
 import { EntityInfo, LigandInfo, getEntityInfo } from './helpers/structure-info';
 import { SubstructureDef } from './helpers/substructure-def';
 
+const logger = getLogger(module);
 
 /** Radius around a ligand to consider as "environment" and show as ball-and-stick in ligand images; in Angstroms, applied by-residue */
 const LIGAND_ENVIRONMENT_RADIUS = 5;
@@ -62,10 +67,12 @@ const VALIDATION_UNAVAILABLE_COLOR = FADED_COLOR;
 
 export type StructureObjSelector = StateObjectSelector<PluginStateObject.Molecule.Structure, any>
 
-type StandardComponentType = 'polymer' | 'branched' | 'branchedLinkage' | 'ligand' | 'ion' | 'nonstandard'
+type StandardComponentType = 'polymer' | 'branched' | 'branchedLinkage' | 'ligand' | 'ion' | 'nonstandard' | 'pocket' 
 type LigEnvComponentType = 'ligand' | 'environment' | 'wideEnvironment' | 'linkage'
-type StandardVisualType = 'polymerCartoon' | 'branchedCarbohydrate' | 'branchedSticks' | 'branchedLinkageSticks' | 'ligandSticks' | 'ionSticks' | 'nonstandardSticks'
+type ResidueComponentType = 'residue'
+type StandardVisualType = 'polymerCartoon' | 'branchedCarbohydrate' | 'branchedSticks' | 'branchedLinkageSticks' | 'ligandSticks' | 'ionSticks' | 'nonstandardSticks' | 'residueSurface'
 type LigEnvVisualType = 'ligandSticks' | 'environmentSticks' | 'linkageSticks' | 'wideEnvironmentCartoon'
+type ResidueVisualType = 'residueSticks' 
 
 type StructureParams = ParamDefinition.Values<ReturnType<typeof RootStructureDefinition.getParams>>
 type VisualParams = ReturnType<typeof StructureRepresentation3D.createDefaultParams>
@@ -226,7 +233,7 @@ export class StructureNode extends Node<PluginStateObject.Molecule.Structure> {
         }
     }
     /** Create components "polymer", "branched", "ligand", "ion", "nonstandard" for a structure */
-    async makeStandardComponents(collapsed: boolean = false): Promise<StandardComponents> {
+    async makeStandardComponents(collapsed: boolean = false, pocket_nums?:[]): Promise<StandardComponents> {
         const options: Partial<StateTransform.Options> = { state: { isCollapsed: collapsed } };
         const polymer = await this.makeComponent({ type: { name: 'static', params: 'polymer' } }, options, 'polymer');
         const branched = await this.makeComponent({ type: { name: 'static', params: 'branched' } }, options, 'branched');
@@ -234,8 +241,31 @@ export class StructureNode extends Node<PluginStateObject.Molecule.Structure> {
         const ligand = await this.makeComponent({ type: { name: 'static', params: 'ligand' } }, options, 'ligand');
         const ion = await this.makeComponent({ type: { name: 'static', params: 'ion' } }, options, 'ion');
         const nonstandard = await this.makeComponent({ type: { name: 'static', params: 'non-standard' } }, options, 'nonstandard');
-        return new StandardComponents({ polymer, branched, branchedLinkage, ligand, ion, nonstandard });
+        /** selection residue nums */
+        const ligExprs = pocket_nums?.map((i) => 
+                            MolScriptBuilder.struct.generator.atomGroups( {
+                            'residue-test': MolScriptBuilder.core.rel.eq([MolScriptBuilder.struct.atomProperty.macromolecular.label_seq_id(), Number(i)])
+                            }))
+        /** const ligExprs: Expression[] = pocket_list?.map((i) => i); */
+        const ligExpr = MolScriptBuilder.struct.combinator.merge(ligExprs);
+
+        const pocket = await this.makeComponent({type: { name: 'expression', params: ligExpr },label: 'pocket' }, options, 'residueSurface');
+        return new StandardComponents({ polymer, branched, branchedLinkage, ligand, ion, nonstandard, pocket });
     }
+
+    /** Create components "residue static" a structure */
+    async makeResidueComponents(collapsed: boolean = false, static_num:[]): Promise<residueStaticComponents> {
+        const options: Partial<StateTransform.Options> = { state: { isCollapsed: collapsed } };
+        const ligExprs = static_num?.map((i) => 
+                            MolScriptBuilder.struct.generator.atomGroups( {
+                            'residue-test': MolScriptBuilder.core.rel.eq([MolScriptBuilder.struct.atomProperty.macromolecular.label_seq_id(), Number(i)])
+                            }))
+        /** const ligExprs: Expression[] = pocket_list?.map((i) => i); */
+        const ligExpr = MolScriptBuilder.struct.combinator.merge(ligExprs);
+        const residue = await this.makeComponent({type: { name: 'expression', params: ligExpr },label: 'static_residue' }, options, 'static_residue');
+        return new residueStaticComponents({ residue });
+    }
+
     /** Create components "ligand" and "environment" for a ligand */
     async makeLigEnvComponents(ligandInfo: LigandInfo, collapsed: boolean = false): Promise<LigandEnvironmentComponents> {
         const options: Partial<StateTransform.Options> = { state: { isCollapsed: collapsed } };
@@ -384,6 +414,15 @@ export class StructureNode extends Node<PluginStateObject.Molecule.Structure> {
             sizeTheme: { name: 'uniform', params: { value: 1 } },
         }, options, tags);
     }
+
+    /** Create a surface visual node with this node as parent */
+    async makeSurface(options: { showHydrogens?: boolean, allowLowestQuality?: boolean }, tags?: string[]): Promise<VisualNode> {
+        return await this.makeVisual({
+            type: { name: 'molecular-surface', params: {} },
+            colorTheme: { name: 'element-symbol', params: { carbonColor: { name: 'element-symbol', params: {} } } }, // in original: carbonColor: chain-id
+            sizeTheme: { name: 'physical', params: { scale: 1} },
+        }, options, tags);
+    }
 }
 
 
@@ -486,6 +525,16 @@ export class VisualNode extends Node<PluginStateObject.Molecule.Structure.Repres
         });
     }
 
+    /** Color this visual by rainbow values */
+    async setColorSequenceId(options?: { colorList?: Color[], ignoreElementColors?: boolean }) {
+        const palette = paletteParam(options?.colorList);
+        return this.updateVisual(old => ({
+            colorTheme: (old.type.name === 'ball-and-stick' && !options?.ignoreElementColors) ?
+                { name: 'element-symbol', params: { carbonColor: { name: 'unit-index', params: { palette } } } }
+                : { name: 'sequence-id', params: { } }
+        }));
+    }
+
     /** Change this visual to putty type */
     async setPutty() {
         return this.updateVisual({
@@ -499,6 +548,15 @@ export class VisualNode extends Node<PluginStateObject.Molecule.Structure.Repres
         return this.updateVisual({
             type: { name: 'carton', params: { visuals: null } },
             sizeTheme: { name: 'uniform', params: null }
+        });
+    }
+
+    /** Change this visual to surface type */
+    async setSurface() {
+        return this.updateVisual({
+            type: { name: 'molecular-surface', params: {resolution: 0.5, doubleSided: true, alpha: STICK_SIZE_ASPECT_RATIO} },
+            colorTheme: { name: 'uniform', params: {value : '0xa5aa99'}}, // in original: carbonColor: chain-id
+            sizeTheme: { name: 'physical', params: { scale: 1} },
         });
     }
 
@@ -580,6 +638,7 @@ export class StandardComponents extends NodeCollection<StandardComponentType, St
         const ligandSticks = await this.nodes.ligand?.makeBallsAndSticks(options, ['ligandSticks']);
         const ionSticks = await this.nodes.ion?.makeBallsAndSticks(options, ['ionSticks']);
         const nonstandardSticks = await this.nodes.nonstandard?.makeBallsAndSticks(options, ['nonstandardSticks']);
+        const residueSurface = await this.nodes.pocket?.makeSurface(options, ['residueSurface']);
         return new StandardVisuals({
             polymerCartoon,
             branchedCarbohydrate,
@@ -588,6 +647,7 @@ export class StandardComponents extends NodeCollection<StandardComponentType, St
             ligandSticks,
             ionSticks,
             nonstandardSticks,
+            residueSurface,
         });
     }
 }
@@ -614,6 +674,15 @@ export class LigandEnvironmentComponents extends NodeCollection<LigEnvComponentT
     }
 }
 
+export class residueStaticComponents extends NodeCollection<ResidueComponentType, StructureNode> {
+    /** Create visuals like ligand balls-and-sticks, wider enviroment cartoon... */
+    async makeResidueVisuals(options: { showHydrogens?: boolean, allowLowestQuality?: boolean, entityColors?: Color[] }): Promise<residueStaticVisuals> {
+        const residueSticks = await this.nodes.residue?.makeBallsAndSticks(options, ['residueSticks']);
+        await residueSticks?.setThinBallsAndSticks(ENVIRONMENT_STICK_SIZE_FACTOR);
+
+        return new residueStaticVisuals({residueSticks});
+    }
+}
 
 /** Collection of nodes for standard structure component visuals like polymer cartoon, ligand balls-and-sticks... */
 export class StandardVisuals extends NodeCollection<StandardVisualType, VisualNode> {
@@ -623,6 +692,8 @@ export class StandardVisuals extends NodeCollection<StandardVisualType, VisualNo
 export class LigandEnvironmentVisuals extends NodeCollection<LigEnvVisualType, VisualNode> {
 }
 
+export class residueStaticVisuals extends NodeCollection<ResidueVisualType, VisualNode> {
+}
 
 /** Decide quality (e.g. 'medium', 'low, 'lowest'...) based on the size of the structure itself (i.e. the visualized part),
  * not based on its root (i.e. the whole model) as 'auto' does */

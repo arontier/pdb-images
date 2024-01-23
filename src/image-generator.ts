@@ -79,7 +79,7 @@ export class ImageGenerator {
     }
 
     /** Create all requested images for an entry */
-    async processAll(entryId: string, inputUrl: string, mode: 'pdb' | 'alphafold') {
+    async processAll(entryId: string, inputUrl: string, mode: 'pdb' | 'alphafold', pocket_num:[], static_num:[]) {
         logger.info('Processing', entryId, 'from', inputUrl);
         const isBinary = inputUrl.endsWith('.bcif');
         logger.debug('Assuming input is', isBinary ? 'binary CIF' : 'mmCIF');
@@ -105,7 +105,7 @@ export class ImageGenerator {
 
                     // Images from deposited model structure
                     if (this.shouldRender('entry', 'validation', 'bfactor', 'ligand', 'domain', 'plddt') || this.failedEntities.length > 0) {
-                        await this.processDepositedStructure(mode, entryId, model, traj);
+                        await this.processDepositedStructure(mode, entryId, model, traj, pocket_num, static_num);
                     }
 
                     if (this.failedEntities.length > 0) {
@@ -122,11 +122,11 @@ export class ImageGenerator {
     }
 
     /** Create requested images which are generated from the deposited model */
-    private async processDepositedStructure(mode: 'pdb' | 'alphafold', entryId: string, model: ModelNode, traj: TrajectoryNode) {
+    private async processDepositedStructure(mode: 'pdb' | 'alphafold', entryId: string, model: ModelNode, traj: TrajectoryNode, pocket_num:[], static_num:[]) {
         logger.info('Processing deposited structure');
         await using(model.makeStructure({ type: { name: 'model', params: {} } }), async structure => {
             const group = await structure.makeGroup({ label: 'Whole Entry' }, { state: { isGhost: ALLOW_GHOST_NODES } });
-            const components = await group.makeStandardComponents(ALLOW_COLLAPSED_NODES);
+            const components = await group.makeStandardComponents(ALLOW_COLLAPSED_NODES, pocket_num);
             const visuals = await components.makeStandardVisuals(this.options);
             this.orientAndZoomAll(structure);
             const nModels = traj.data?.frameCount ?? 1;
@@ -136,18 +136,24 @@ export class ImageGenerator {
                 entityNames: await this.api.getEntityNames(entryId),
                 entityInfo: getEntityInfo(structure.data!)
             };
-            /** const colors = assignEntityAndUnitColors(structure.data!); */
-            const colors = assignEntityAndUnitRainColors(structure.data!);
+            const colors = assignEntityAndUnitColors(structure.data!); 
+            /** const colors = assignEntityAndUnitRainColors(structure.data!); */
 
             if (mode === 'pdb') {
                 if (this.shouldRender('entry')) {
                     if (nModels === 1) {
                         /** await visuals.applyToAll(vis => vis.setColorByChainInstance({ colorList: colors.units })); */
-                        await visuals.applyToAll(vis => vis.setColorByBfactor('rainbow'));
+                        await visuals.applyToAll(vis => vis.setColorSequenceId({ colorList: colors.units }));
+                        await visuals.nodes.residueSurface?.setSurface();
                         await this.saveViews('all', view => Captions.forEntryOrAssembly({ ...context, coloring: 'chains', view }));
+                        if (static_num) {
+                            const residue = await group.makeResidueComponents(ALLOW_COLLAPSED_NODES, static_num);
+                            const visuals_residue = await residue.makeResidueVisuals(this.options);
+                            await this.saveViews('all', view => Captions.forEntryOrAssembly({ ...context, coloring: 'static', view }));
+                        }
 
-                        await visuals.applyToAll(vis => vis.setColorByEntity({ colorList: colors.entities }));
-                        await this.saveViews('all', view => Captions.forEntryOrAssembly({ ...context, coloring: 'entities', view }));
+                        await visuals.applyToAll(vis => vis.setColorByEntity({ colorList: colors.entities })); 
+                        await this.saveViews('all', view => Captions.forEntryOrAssembly({ ...context, coloring: 'entities', view })); 
                     } else {
                         model.setCollapsed(ALLOW_COLLAPSED_NODES);
                         const visualsByModel = [visuals];
@@ -165,7 +171,8 @@ export class ImageGenerator {
                             this.zoomAll(); // zoom whole ensemble (needed e.g. for 3gaw)
                             for (let i = 0; i < visualsByModel.length; i++) {
                                 const unitColors = this.options.ensembleShades ? lightnessVariant(colors.units, i) : colors.units;
-                                await visualsByModel[i].applyToAll(vis => vis.setColorByChainInstance({ colorList: unitColors }));
+                                /** await visualsByModel[i].applyToAll(vis => vis.setColorByChainInstance({ colorList: unitColors })); */
+                                await visuals.applyToAll(vis => vis.setColorSequenceId({ colorList: colors.units }));
                             }
                             await this.saveViews('all', view => Captions.forEntryOrAssembly({ ...context, coloring: 'chains', view }));
 
@@ -179,6 +186,7 @@ export class ImageGenerator {
                         model.setCollapsed(false);
                     }
                 }
+
 
                 if (this.shouldRender('validation')) {
                     const structQualityReport = await this.api.getPdbeStructureQualityReport(entryId);

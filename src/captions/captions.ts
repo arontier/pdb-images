@@ -53,9 +53,9 @@ export namespace Captions {
     }
 
     /** Create captions for `entity` or `assembly` image type. */
-    export function forEntryOrAssembly(context: StructureContext & { isPreferredAssembly: boolean, nModels: number, coloring: 'chains' | 'entities', view: ViewType }): ImageSpec {
+    export function forEntryOrAssembly(context: StructureContext & { isPreferredAssembly: boolean, nModels: number, coloring: 'chains' | 'entities' | 'static', view: ViewType }): ImageSpec {
         const { entryId, assemblyId, isPreferredAssembly, nModels, coloring, entityInfo, view } = context;
-        const colorClause = coloring === 'chains' ? 'by chain' : 'by chemically distinct molecules';
+        const colorClause = coloring;
         const modelClause = nModels > 1 ? `ensemble of ${nModels} models` : '';
         const description = new TextBuilder();
         description.push(structurePhrase(context), B_, entryId, _B, 'coloured', colorClause, ',', modelClause, ',', viewPhrase(view), '.');
@@ -69,7 +69,7 @@ export namespace Captions {
         }
         description.push('.', _UL);
         const assemblyPrefix = assemblyId ? `assembly_${assemblyId}` : 'deposited';
-        const colorSuffix = coloring === 'chains' ? 'chain' : 'chemically_distinct_molecules';
+        const colorSuffix = coloring;
         return {
             filename: `${entryId}_${assemblyPrefix}_${colorSuffix}${viewSuffix(view)}`,
             alt: new TextBuilder().push(structurePhrase(context, 'short'), entryId, 'coloured', colorClause, ',', modelClause, ',', viewPhrase(view), '.').buildPlainText(),
