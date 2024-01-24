@@ -39,17 +39,18 @@ async function getExpectedFilenameStemsForPdbMode(entryId: string, types: Set<Im
     if (types.has('entry')) {
         if (view === 'front') {
             result.push(
-                `${entryId}_deposited_chain`,
-                `${entryId}_deposited_chemically_distinct_molecules`,
+                `${entryId}_deposited_chains`,
+                `${entryId}_deposited_entities`,
+                `${entryId}_deposited_static`,
             );
         } else {
             result.push(
-                `${entryId}_deposited_chain_front`,
-                `${entryId}_deposited_chain_side`,
-                `${entryId}_deposited_chain_top`,
-                `${entryId}_deposited_chemically_distinct_molecules_front`,
-                `${entryId}_deposited_chemically_distinct_molecules_side`,
-                `${entryId}_deposited_chemically_distinct_molecules_top`,
+                `${entryId}_deposited_chains_front`,
+                `${entryId}_deposited_chains_side`,
+                `${entryId}_deposited_chains_top`,
+                `${entryId}_deposited_entities_front`,
+                `${entryId}_deposited_entities_side`,
+                `${entryId}_deposited_entities_top`,
             );
         }
     }
@@ -59,17 +60,17 @@ async function getExpectedFilenameStemsForPdbMode(entryId: string, types: Set<Im
             const assId = assembly.assemblyId;
             if (view === 'front') {
                 result.push(
-                    `${entryId}_assembly_${assId}_chain`,
-                    `${entryId}_assembly_${assId}_chemically_distinct_molecules`,
+                    `${entryId}_assembly_${assId}_chains`,
+                    `${entryId}_assembly_${assId}_entities`,
                 );
             } else {
                 result.push(
-                    `${entryId}_assembly_${assId}_chain_front`,
-                    `${entryId}_assembly_${assId}_chain_side`,
-                    `${entryId}_assembly_${assId}_chain_top`,
-                    `${entryId}_assembly_${assId}_chemically_distinct_molecules_front`,
-                    `${entryId}_assembly_${assId}_chemically_distinct_molecules_side`,
-                    `${entryId}_assembly_${assId}_chemically_distinct_molecules_top`,
+                    `${entryId}_assembly_${assId}_chains_front`,
+                    `${entryId}_assembly_${assId}_chains_side`,
+                    `${entryId}_assembly_${assId}_chains_top`,
+                    `${entryId}_assembly_${assId}_entities_front`,
+                    `${entryId}_assembly_${assId}_entities_side`,
+                    `${entryId}_assembly_${assId}_entities_top`,
                 );
             }
         }
