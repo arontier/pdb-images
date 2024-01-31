@@ -41,7 +41,6 @@ async function getExpectedFilenameStemsForPdbMode(entryId: string, types: Set<Im
             result.push(
                 `${entryId}_deposited_chains`,
                 `${entryId}_deposited_entities`,
-                `${entryId}_deposited_static`,
             );
         } else {
             result.push(
