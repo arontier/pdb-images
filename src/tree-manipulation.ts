@@ -233,7 +233,7 @@ export class StructureNode extends Node<PluginStateObject.Molecule.Structure> {
         }
     }
     /** Create components "polymer", "branched", "ligand", "ion", "nonstandard" for a structure */
-    async makeStandardComponents(collapsed: boolean = false, pocket_nums?:[]): Promise<StandardComponents> {
+    async makeStandardComponents(collapsed: boolean = false, pocket_nums?:string[]): Promise<StandardComponents> {
         const options: Partial<StateTransform.Options> = { state: { isCollapsed: collapsed } };
         const polymer = await this.makeComponent({ type: { name: 'static', params: 'polymer' } }, options, 'polymer');
         const branched = await this.makeComponent({ type: { name: 'static', params: 'branched' } }, options, 'branched');
@@ -242,10 +242,29 @@ export class StructureNode extends Node<PluginStateObject.Molecule.Structure> {
         const ion = await this.makeComponent({ type: { name: 'static', params: 'ion' } }, options, 'ion');
         const nonstandard = await this.makeComponent({ type: { name: 'static', params: 'non-standard' } }, options, 'nonstandard');
         /** selection residue nums */
-        const ligExprs = pocket_nums?.map((i) => 
-                            MolScriptBuilder.struct.generator.atomGroups( {
-                            'residue-test': MolScriptBuilder.core.rel.eq([MolScriptBuilder.struct.atomProperty.macromolecular.label_seq_id(), Number(i)])
-                            }))
+        const ligExprs = [];
+        if (pocket_nums || Array.isArray(pocket_nums)) {
+            for (let i = 0; 1 < pocket_nums?.length; i++) {
+                const num = pocket_nums[i];
+                let builder, chain, reside;
+                if (num === undefined) {
+                    // pocket_num이 undefined인 경우 루프 중단
+                    break;
+                }
+                if (/^\d+$/.test(num)) {
+                    builder = MolScriptBuilder.struct.generator.atomGroups( {
+                              'residue-test': MolScriptBuilder.core.rel.eq([MolScriptBuilder.struct.atomProperty.macromolecular.label_seq_id(), Number(num)])
+                                });
+                } else {
+                    [chain, reside] = num.split('_').map((value, index) => (index === 1 ? parseInt(value) : value));
+                    builder = MolScriptBuilder.struct.generator.atomGroups( {
+                              'chain-test': MolScriptBuilder.core.rel.eq([MolScriptBuilder.struct.atomProperty.macromolecular.label_asym_id(),chain]),
+                              'residue-test': MolScriptBuilder.core.rel.eq([MolScriptBuilder.struct.atomProperty.macromolecular.label_seq_id(), Number(reside)])
+                                });
+                }
+                ligExprs.push(builder);
+            }
+        }
         /** const ligExprs: Expression[] = pocket_list?.map((i) => i); */
         const ligExpr = MolScriptBuilder.struct.combinator.merge(ligExprs);
 
@@ -254,12 +273,34 @@ export class StructureNode extends Node<PluginStateObject.Molecule.Structure> {
     }
 
     /** Create components "residue static" a structure */
-    async makeResidueComponents(collapsed: boolean = false, static_num:[]): Promise<residueStaticComponents> {
+    async makeResidueComponents(collapsed: boolean = false, static_num:string[]): Promise<residueStaticComponents> {
         const options: Partial<StateTransform.Options> = { state: { isCollapsed: collapsed } };
-        const ligExprs = static_num?.map((i) => 
-                            MolScriptBuilder.struct.generator.atomGroups( {
-                            'residue-test': MolScriptBuilder.core.rel.eq([MolScriptBuilder.struct.atomProperty.macromolecular.label_seq_id(), Number(i)])
-                            }))
+
+        const ligExprs = [];
+        for (let i = 0; 1 < static_num.length; i++) {
+            const num = static_num[i];
+            let builder, chain, reside;
+            if (num === undefined) {
+                // pocket_num이 undefined인 경우 루프 중단
+                break;
+            }
+            if (/^\d+$/.test(num)) {
+                builder = MolScriptBuilder.struct.generator.atomGroups( {
+                          'residue-test': MolScriptBuilder.core.rel.eq([MolScriptBuilder.struct.atomProperty.macromolecular.label_seq_id(), Number(num)])
+                            });
+            } else {
+                [chain, reside] = num.split('_').map((value, index) => (index === 1 ? parseInt(value) : value));
+                builder = MolScriptBuilder.struct.generator.atomGroups( {
+                          'chain-test': MolScriptBuilder.core.rel.eq([MolScriptBuilder.struct.atomProperty.macromolecular.label_asym_id(),chain]),
+                          'residue-test': MolScriptBuilder.core.rel.eq([MolScriptBuilder.struct.atomProperty.macromolecular.label_seq_id(), Number(reside)])
+                            });
+            }
+            ligExprs.push(builder);
+        }
+        /** const ligExprs = static_num?.map((i) => 
+        /**                     MolScriptBuilder.struct.generator.atomGroups( {
+        /**                     'residue-test': MolScriptBuilder.core.rel.eq([MolScriptBuilder.struct.atomProperty.macromolecular.label_seq_id(), Number(i)])
+        /**                     }))
         /** const ligExprs: Expression[] = pocket_list?.map((i) => i); */
         const ligExpr = MolScriptBuilder.struct.combinator.merge(ligExprs);
         const residue = await this.makeComponent({type: { name: 'expression', params: ligExpr },label: 'static_residue' }, options, 'static_residue');
